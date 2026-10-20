@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.consuelomerino.tierracolorada.life.PondRipples
 import com.consuelomerino.tierracolorada.objects.GardenObject
 import com.consuelomerino.tierracolorada.objects.GardenObjects
+import com.consuelomerino.tierracolorada.objects.ObjectType
 import com.consuelomerino.tierracolorada.sand.ClearSweep
 import com.consuelomerino.tierracolorada.sand.HeightMap
 import com.consuelomerino.tierracolorada.sand.Rake
@@ -19,6 +20,7 @@ import com.consuelomerino.tierracolorada.sand.SandTools
 import com.consuelomerino.tierracolorada.storage.GardenSnapshot
 import com.consuelomerino.tierracolorada.storage.GardenStore
 import java.io.File
+import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -141,6 +143,54 @@ class GardenViewModel(
             pondRipples.tap(x, y, clock())
             _events.tryEmit(GardenEvent.WaterTap)
         }
+    }
+
+    val gardenFull: Boolean get() = objects.size >= GardenObjects.MAX_OBJECTS
+
+    fun canAdd(type: ObjectType): Boolean =
+        !gardenFull && (type != ObjectType.POND || objects.none { it.type == ObjectType.POND })
+
+    fun addObject(type: ObjectType, x: Float, y: Float) {
+        if (heights == null) return
+        val added = garden.add(type, x, y, Random.nextInt()) ?: return
+        objectsChanged()
+        if (added.type == ObjectType.STONE) pressIntoSand(added)
+    }
+
+    fun moveObject(id: Long, x: Float, y: Float) {
+        if (heights == null) return
+        garden.move(id, x, y) ?: return
+        objectsChanged()
+    }
+
+    /** Called when the finger lets go of a moved object; a stone settles and presses its rings. */
+    fun endMoveObject(id: Long) {
+        if (heights == null) return
+        garden.items.firstOrNull { it.id == id && it.type == ObjectType.STONE }?.let { pressIntoSand(it) }
+    }
+
+    fun transformObject(id: Long, scale: Float, rotation: Float) {
+        if (heights == null) return
+        garden.transform(id, scale, rotation) ?: return
+        objectsChanged()
+    }
+
+    fun deleteObject(id: Long) {
+        if (heights == null) return
+        garden.remove(id)
+        objectsChanged()
+    }
+
+    private fun pressIntoSand(stone: GardenObject) {
+        val map = heights ?: return
+        SandTools.stampRipples(map, stone.x, stone.y, stone.radius) { x, y -> garden.isBlocked(x, y) }
+        sandChanged()
+        _events.tryEmit(GardenEvent.StonePlaced)
+    }
+
+    private fun objectsChanged() {
+        objects = garden.items
+        unsaved = true
     }
 
     fun requestClear() {
