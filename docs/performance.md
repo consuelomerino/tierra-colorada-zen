@@ -23,3 +23,16 @@ The spec's target is smooth raking at 60 fps on a mid-range phone.
 The gfxinfo percentiles (~20–26 ms) are above 16 ms because they measure the pipelined time from vsync to frame completion (UI thread plus RenderThread overlap), not the frame rate. Android's own "Janky frames" counter, which counts missed deadlines, reports 0.
 
 With the emulator's default software renderer (SwiftShader), frames already took ~23 ms with no raking at all; raking added only ~2 ms. That renderer is not representative of a phone's GPU. Real-device numbers come from the closed testers.
+
+## Re-check with 30 objects (after the final review)
+
+The final code review pointed out that the always-animating life layer shared a graphics layer with the sand, so the sand and every object were redrawn every frame. A temporary counter confirmed it: the sand canvas drew **308 times in 5 s while idle**. Each canvas now has its own `graphicsLayer()`, and the count dropped to **0**.
+
+Measured with 30 objects (10 stones, 10 ferns, 10 heliconias), host GPU, continuous 120-step stroke:
+
+| Scenario | Before | After |
+|---|---|---|
+| Idle: missed vsyncs / work p50 | 0 / 23.2 ms | 0 / 20.2 ms |
+| Raking: missed vsyncs / work p50 / p90 | 0 / 26.1 / 29.5 ms | 0 / 20.8 / 21.4 ms |
+
+Raking over a full garden now costs about the same as an empty one.

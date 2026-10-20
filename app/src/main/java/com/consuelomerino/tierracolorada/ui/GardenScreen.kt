@@ -29,6 +29,7 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.FilterQuality
@@ -209,6 +210,8 @@ private fun SandCanvas(
     Canvas(
         Modifier
             .fillMaxSize()
+            // Own layer: the ambient animation above repaints every frame, the garden only when it changes.
+            .graphicsLayer()
             .pointerInput(viewModel, cellSize) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -274,7 +277,7 @@ private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: 
             while (true) withFrameMillis { now = System.currentTimeMillis() }
         }
     }
-    Canvas(Modifier.fillMaxSize()) {
+    Canvas(Modifier.fillMaxSize().graphicsLayer()) {
         val objects = viewModel.objects
         val state = director.update(now, objects, reducedMotion)
         snapshot.state = state
