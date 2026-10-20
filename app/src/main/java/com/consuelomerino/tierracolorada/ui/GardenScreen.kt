@@ -50,13 +50,22 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.consuelomerino.tierracolorada.R
 import com.consuelomerino.tierracolorada.life.LifeDirector
+import com.consuelomerino.tierracolorada.life.LifeState
 import com.consuelomerino.tierracolorada.life.drawLife
 import com.consuelomerino.tierracolorada.objects.GardenObject
 import com.consuelomerino.tierracolorada.objects.ObjectType
 import com.consuelomerino.tierracolorada.objects.drawGardenObject
+import com.consuelomerino.tierracolorada.sand.CellRect
 import com.consuelomerino.tierracolorada.sand.HeightMap
 import com.consuelomerino.tierracolorada.sand.SandShader
+import com.consuelomerino.tierracolorada.share.GardenSharer
 import kotlin.random.Random
+
+/** The most recent frame of ambient life, kept so a shared picture can include it. */
+private class LifeSnapshot {
+    var state = LifeState(null, emptyList(), 0f, showShadows = false)
+    var nowMs = 0L
+}
 
 /** An object being dragged: a new one from the tray ([newType]) or an existing one ([movingId]). */
 private data class Drag(val newType: ObjectType? = null, val movingId: Long? = null, val finger: Offset)
@@ -74,6 +83,9 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
 
     var drag by remember { mutableStateOf<Drag?>(null) }
     var trashBounds by remember { mutableStateOf(Rect.Zero) }
+    val lifeSnapshot = remember { LifeSnapshot() }
+    val context = LocalContext.current
+    val appName = stringResource(R.string.app_name)
 
     BoxWithConstraints(Modifier.fillMaxSize().testTag("garden")) {
         val widthPx = constraints.maxWidth
@@ -97,7 +109,7 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
             },
         )
 
-        LifeLayer(viewModel, heights, cellSize)
+        LifeLayer(viewModel, heights, cellSize, lifeSnapshot)
 
         // Ghost of a new object being dragged from the tray.
         drag?.newType?.let { type ->
@@ -137,11 +149,17 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
             Toolbar(
                 tool = viewModel.tool,
                 muted = viewModel.muted,
-                shareEnabled = false,
+                shareEnabled = true,
                 onSelectTool = viewModel::selectTool,
                 onClear = viewModel::requestClear,
                 onToggleMute = viewModel::toggleMute,
-                onShare = {},
+                onShare = {
+                    val image = GardenSharer.render(
+                        widthPx, heightPx, fullSandImage(heights), viewModel.objects, lifeSnapshot.state,
+                        viewModel.pondRipples.active(lifeSnapshot.nowMs), lifeSnapshot.nowMs, appName,
+                    )
+                    GardenSharer.share(context, image)
+                },
             )
         }
 
@@ -243,7 +261,7 @@ private fun SandCanvas(
 
 /** Hummingbird, leaves, shadows and ripples, animated only while the app is visible. */
 @Composable
-private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: Float) {
+private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: Float, snapshot: LifeSnapshot) {
     val context = LocalContext.current
     val reducedMotion = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
@@ -259,7 +277,18 @@ private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: 
     Canvas(Modifier.fillMaxSize()) {
         val objects = viewModel.objects
         val state = director.update(now, objects, reducedMotion)
+        snapshot.state = state
+        snapshot.nowMs = now
         drawLife(state, viewModel.pondRipples.active(now), now, cellSize, objects.firstOrNull { it.type == ObjectType.POND })
+    }
+}
+
+/** Shades the whole sand surface into a fresh image (for sharing). */
+private fun fullSandImage(heights: HeightMap): ImageBitmap {
+    val pixels = IntArray(heights.width * heights.height)
+    SandShader.shade(heights, CellRect(0, 0, heights.width, heights.height), pixels)
+    return ImageBitmap(heights.width, heights.height).also {
+        it.asAndroidBitmap().setPixels(pixels, 0, heights.width, 0, 0, heights.width, heights.height)
     }
 }
 
