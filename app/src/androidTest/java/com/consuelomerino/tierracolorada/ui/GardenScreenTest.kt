@@ -1,5 +1,9 @@
 package com.consuelomerino.tierracolorada.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -39,6 +43,18 @@ class GardenScreenTest {
         settle()
         rule.onNodeWithTag("tool_smooth").assertIsSelected()
         rule.onNodeWithTag("tool_rake").assertIsNotSelected()
+    }
+
+    @Test fun actionsAreButtonsAndToolsAreTabs() {
+        // TalkBack must announce Clear, Mute and Share as buttons, not as tabs that can be selected.
+        val button = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+        val notSelectable = SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected)
+        for (tag in listOf("tool_clear", "mute", "share")) {
+            rule.onNodeWithTag(tag).assert(button).assert(notSelectable)
+        }
+        for (tag in listOf("tool_rake", "tool_place", "tool_smooth")) {
+            rule.onNodeWithTag(tag).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))
+        }
     }
 
     @Test fun clearAsksForConfirmation() {
