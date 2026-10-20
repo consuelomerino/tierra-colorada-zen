@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
@@ -57,10 +58,11 @@ import com.consuelomerino.tierracolorada.objects.GardenObject
 import com.consuelomerino.tierracolorada.objects.GardenObjects
 import com.consuelomerino.tierracolorada.objects.ObjectType
 import com.consuelomerino.tierracolorada.objects.drawGardenObject
-import com.consuelomerino.tierracolorada.sand.CellRect
 import com.consuelomerino.tierracolorada.sand.HeightMap
 import com.consuelomerino.tierracolorada.sand.SandShader
 import com.consuelomerino.tierracolorada.share.GardenSharer
+import com.consuelomerino.tierracolorada.share.ShareContent
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /** The most recent frame of ambient life, kept so a shared picture can include it. */
@@ -88,6 +90,8 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
     val lifeSnapshot = remember { LifeSnapshot() }
     val context = LocalContext.current
     val appName = stringResource(R.string.app_name)
+    val scope = rememberCoroutineScope()
+    var sharing by remember { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize().testTag("garden")) {
         val widthPx = constraints.maxWidth
@@ -151,16 +155,24 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
             Toolbar(
                 tool = viewModel.tool,
                 muted = viewModel.muted,
-                shareEnabled = true,
+                shareEnabled = !sharing,
                 onSelectTool = viewModel::selectTool,
                 onClear = viewModel::requestClear,
                 onToggleMute = viewModel::toggleMute,
                 onShare = {
-                    val image = GardenSharer.render(
-                        widthPx, heightPx, fullSandImage(heights), viewModel.objects, lifeSnapshot.state,
-                        viewModel.pondRipples.active(lifeSnapshot.nowMs), lifeSnapshot.nowMs, appName,
+                    val content = ShareContent(
+                        widthPx, heightPx, HeightMap(heights.width, heights.height, heights.values.copyOf()),
+                        viewModel.objects, lifeSnapshot.state, viewModel.pondRipples.active(lifeSnapshot.nowMs),
+                        lifeSnapshot.nowMs, appName,
                     )
-                    GardenSharer.share(context, image)
+                    sharing = true
+                    scope.launch {
+                        try {
+                            GardenSharer.openShareSheet(context, GardenSharer.createImageFile(context, content))
+                        } finally {
+                            sharing = false
+                        }
+                    }
                 },
             )
         }
@@ -294,15 +306,6 @@ private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: 
         snapshot.state = state
         snapshot.nowMs = now
         drawLife(state, viewModel.pondRipples.active(now), now, cellSize, objects.firstOrNull { it.type == ObjectType.POND })
-    }
-}
-
-/** Shades the whole sand surface into a fresh image (for sharing). */
-private fun fullSandImage(heights: HeightMap): ImageBitmap {
-    val pixels = IntArray(heights.width * heights.height)
-    SandShader.shade(heights, CellRect(0, 0, heights.width, heights.height), pixels)
-    return ImageBitmap(heights.width, heights.height).also {
-        it.asAndroidBitmap().setPixels(pixels, 0, heights.width, 0, 0, heights.width, heights.height)
     }
 }
 
