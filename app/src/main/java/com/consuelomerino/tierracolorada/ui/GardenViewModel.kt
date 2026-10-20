@@ -24,6 +24,7 @@ import java.io.File
 import java.io.IOException
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -60,16 +61,26 @@ class GardenViewModel(
         private set
     var heights: HeightMap? by mutableStateOf(null)
         private set
+    /** True while a Smooth stroke is down; the screen then calls [smoothFrame] once per frame. */
+    var smoothing by mutableStateOf(false)
+        private set
+    /** True while a Rake stroke is down; scrape speeds that arrive after it ends are stale. */
+    var raking = false
+        private set
 
     val pondRipples = PondRipples()
 
-    private val _events = MutableSharedFlow<GardenEvent>(extraBufferCapacity = 16)
+    // When the listener falls behind, drop the oldest events: the newest ones (like the stop at the
+    // end of a rake stroke) matter most.
+    private val _events = MutableSharedFlow<GardenEvent>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<GardenEvent> = _events
 
     private lateinit var garden: GardenObjects
     private lateinit var rake: Rake
     private var sweep: ClearSweep? = null
     private var rakeTravel = 0f
+    private var smoothX = 0f
+    private var smoothY = 0f
     @Volatile private var unsaved = false
 
     init {
@@ -81,12 +92,25 @@ class GardenViewModel(
         }
     }
 
+    /**
+     * Sets up the garden for a grid of this size: loads the saved one the first time, and re-fits the
+     * current one when the window changes size (split screen, a foldable), so the sand stays under the finger.
+     */
     fun initialize(gridWidth: Int, gridHeight: Int) {
-        if (heights != null) return
-        val snapshot = store.load(gridWidth, gridHeight)
+        val current = heights
+        val snapshot = when {
+            current == null -> store.load(gridWidth, gridHeight)
+            current.width == gridWidth && current.height == gridHeight -> return
+            else -> {
+                strokeEnd()
+                unsaved = true
+                GardenSnapshot(current, garden.items, muted).fittedTo(gridWidth, gridHeight)
+            }
+        }
         val map = snapshot?.heights ?: HeightMap(gridWidth, gridHeight)
         garden = GardenObjects(gridWidth, gridHeight, snapshot?.objects.orEmpty())
         rake = Rake(map) { x, y -> garden.isBlocked(x, y) }
+        if (sweep != null) sweep = ClearSweep(map)
         objects = garden.items
         muted = snapshot?.muted ?: false
         map.markAllDirty()
@@ -99,20 +123,25 @@ class GardenViewModel(
     }
 
     fun strokeStart(x: Float, y: Float) {
-        val map = heights ?: return
+        if (heights == null) return
         when (tool) {
             Tool.RAKE -> {
                 rakeTravel = 0f
+                raking = true
                 rake.beginStroke(x, y)
+                sandChanged()
             }
-            Tool.SMOOTH -> SandTools.smooth(map, x, y) { cx, cy -> garden.isBlocked(cx, cy) }
-            Tool.PLACE -> return
+            Tool.SMOOTH -> {
+                smoothX = x
+                smoothY = y
+                smoothing = true
+            }
+            Tool.PLACE -> Unit
         }
-        sandChanged()
     }
 
     fun strokeMove(x: Float, y: Float, dtMs: Long) {
-        val map = heights ?: return
+        if (heights == null) return
         when (tool) {
             Tool.RAKE -> {
                 val travelled = rake.moveTo(x, y)
@@ -123,16 +152,29 @@ class GardenViewModel(
                 }
                 val speed = if (dtMs > 0) travelled * 1000f / dtMs else 0f
                 _events.tryEmit(GardenEvent.RakeSpeed(speed))
+                sandChanged()
             }
-            Tool.SMOOTH -> SandTools.smooth(map, x, y) { cx, cy -> garden.isBlocked(cx, cy) }
-            Tool.PLACE -> return
+            Tool.SMOOTH -> {
+                smoothX = x
+                smoothY = y
+            }
+            Tool.PLACE -> Unit
         }
+    }
+
+    /** One frame of the Smooth brush under the finger, so holding still keeps flattening the sand. */
+    fun smoothFrame() {
+        val map = heights ?: return
+        if (!smoothing) return
+        SandTools.smooth(map, smoothX, smoothY) { cx, cy -> garden.isBlocked(cx, cy) }
         sandChanged()
     }
 
     fun strokeEnd() {
-        if (tool == Tool.RAKE && heights != null) {
+        smoothing = false
+        if (raking) {
             rake.endStroke()
+            raking = false
             _events.tryEmit(GardenEvent.RakeSpeed(0f))
         }
     }

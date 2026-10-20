@@ -2,6 +2,7 @@ package com.consuelomerino.tierracolorada.storage
 
 import android.util.Log
 import com.consuelomerino.tierracolorada.objects.GardenObject
+import com.consuelomerino.tierracolorada.objects.GardenObjects
 import com.consuelomerino.tierracolorada.objects.ObjectType
 import com.consuelomerino.tierracolorada.sand.HeightMap
 import java.io.ByteArrayOutputStream
@@ -16,7 +17,19 @@ import java.util.zip.Deflater
 import java.util.zip.Inflater
 
 /** Everything that is kept between sessions. */
-data class GardenSnapshot(val heights: HeightMap, val objects: List<GardenObject>, val muted: Boolean)
+data class GardenSnapshot(val heights: HeightMap, val objects: List<GardenObject>, val muted: Boolean) {
+    /** The same garden on a grid of another size: heights resampled and objects moved with them. */
+    fun fittedTo(gridWidth: Int, gridHeight: Int): GardenSnapshot {
+        if (heights.width == gridWidth && heights.height == gridHeight) return this
+        val sx = gridWidth.toFloat() / heights.width
+        val sy = gridHeight.toFloat() / heights.height
+        return GardenSnapshot(
+            heights.resampledTo(gridWidth, gridHeight),
+            objects.map { it.copy(x = it.x * sx, y = it.y * sy) },
+            muted,
+        )
+    }
+}
 
 /** Saves the garden to a private file atomically and loads it back, tolerating damaged files. */
 class GardenStore(private val dir: File) {
@@ -41,7 +54,7 @@ class GardenStore(private val dir: File) {
             out.writeInt(snapshot.objects.size)
             for (o in snapshot.objects) {
                 out.writeLong(o.id)
-                out.writeInt(o.type.ordinal)
+                out.writeInt(typeCode(o.type))
                 out.writeFloat(o.x)
                 out.writeFloat(o.y)
                 out.writeFloat(o.scale)
@@ -70,7 +83,8 @@ class GardenStore(private val dir: File) {
 
     private fun read(input: DataInputStream, fileLength: Long, gridWidth: Int, gridHeight: Int): GardenSnapshot? {
         if (input.readInt() != MAGIC) return invalid("wrong magic")
-        if (input.readInt() != VERSION) return invalid("unknown version")
+        val version = input.readInt()
+        if (version != VERSION && version != VERSION_ORDINAL_TYPES) return invalid("unknown version")
         val width = input.readInt()
         val height = input.readInt()
         if (width !in 1..MAX_DIMENSION || height !in 1..MAX_DIMENSION || width.toLong() * height > MAX_CELLS) {
@@ -83,32 +97,28 @@ class GardenStore(private val dir: File) {
 
         val count = input.readInt()
         if (count !in 0..MAX_OBJECTS_IN_FILE) return invalid("bad object count")
-        val types = ObjectType.entries
-        val objects = List(count) {
+        val objects = ArrayList<GardenObject>(count)
+        repeat(count) {
             val id = input.readLong()
-            val ordinal = input.readInt()
-            if (ordinal !in types.indices) return invalid("bad object type")
-            GardenObject(
-                id = id,
-                type = types[ordinal],
-                x = input.readFloat(),
-                y = input.readFloat(),
-                scale = input.readFloat(),
-                rotation = input.readFloat(),
-                seed = input.readInt(),
-            )
+            val code = input.readInt()
+            val type = (if (version == VERSION_ORDINAL_TYPES) ObjectType.entries.getOrNull(code) else typeForCode(code))
+                ?: return invalid("bad object type")
+            val x = input.readFloat()
+            val y = input.readFloat()
+            val scale = input.readFloat()
+            val rotation = input.readFloat()
+            val seed = input.readInt()
+            // An object with a broken position or angle could never be drawn or moved; leave it out.
+            if (!x.isFinite() || !y.isFinite() || !rotation.isFinite()) {
+                Log.w(TAG, "Dropping saved object $id with a broken position or rotation")
+                return@repeat
+            }
+            val safeScale = if (scale.isFinite()) scale.coerceIn(GardenObjects.MIN_SCALE, GardenObjects.MAX_SCALE) else 1f
+            objects += GardenObject(id, type, x, y, safeScale, rotation, seed)
         }
         val muted = input.readBoolean()
 
-        var heights = HeightMap(width, height, values)
-        var fitted = objects
-        if (width != gridWidth || height != gridHeight) {
-            heights = heights.resampledTo(gridWidth, gridHeight)
-            val sx = gridWidth.toFloat() / width
-            val sy = gridHeight.toFloat() / height
-            fitted = objects.map { it.copy(x = it.x * sx, y = it.y * sy) }
-        }
-        return GardenSnapshot(heights, fitted, muted)
+        return GardenSnapshot(HeightMap(width, height, values), objects, muted).fittedTo(gridWidth, gridHeight)
     }
 
     private fun invalid(reason: String): GardenSnapshot? {
@@ -147,10 +157,23 @@ class GardenStore(private val dir: File) {
     }
 
     companion object {
+        /** File codes for object types; never change or reuse one, only add new ones. */
+        private fun typeCode(type: ObjectType): Int = when (type) {
+            ObjectType.STONE -> 1
+            ObjectType.FERN -> 2
+            ObjectType.HELICONIA -> 3
+            ObjectType.POND -> 4
+        }
+
+        private fun typeForCode(code: Int): ObjectType? = ObjectType.entries.firstOrNull { typeCode(it) == code }
+
         private const val TAG = "GardenStore"
         private const val FILE_NAME = "garden.bin"
         private const val MAGIC = 0x54435A31 // "TCZ1"
-        private const val VERSION = 1
+        /** Version 2 stores object types as the fixed codes below. */
+        private const val VERSION = 2
+        /** Version 1 stored ObjectType.ordinal, which would change meaning if the enum were reordered. */
+        private const val VERSION_ORDINAL_TYPES = 1
         private const val MAX_DIMENSION = 10_000
         /** Far above any real garden (360 × ~1100) and small enough to allocate safely on a phone. */
         private const val MAX_CELLS = 4_000_000L

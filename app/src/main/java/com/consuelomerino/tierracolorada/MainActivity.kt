@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
             GardenEvent.StonePlaced -> audio.play(SoundEffect.STONE)
             GardenEvent.WaterTap -> audio.play(SoundEffect.WATER)
             GardenEvent.Sweep -> audio.play(SoundEffect.SWEEP)
-            is GardenEvent.RakeSpeed -> audio.setRakeSpeed(event.cellsPerSecond)
+            // A speed still queued from a stroke that has ended must not restart the scrape.
+            is GardenEvent.RakeSpeed -> audio.setRakeSpeed(if (viewModel.raking) event.cellsPerSecond else 0f)
             GardenEvent.HapticTick -> Unit
         }
     }

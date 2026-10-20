@@ -2,6 +2,7 @@ package com.consuelomerino.tierracolorada.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -55,23 +56,24 @@ fun Toolbar(
             ToolButton("tool_rake", stringResource(R.string.tool_rake), tool == Tool.RAKE, { onSelectTool(Tool.RAKE) }) { drawRakeGlyph(it) }
             ToolButton("tool_place", stringResource(R.string.tool_place), tool == Tool.PLACE, { onSelectTool(Tool.PLACE) }) { drawPlaceGlyph(it) }
             ToolButton("tool_smooth", stringResource(R.string.tool_smooth), tool == Tool.SMOOTH, { onSelectTool(Tool.SMOOTH) }) { drawSmoothGlyph(it) }
-            ToolButton("tool_clear", stringResource(R.string.tool_clear), false, onClear) { drawClearGlyph(it) }
+            ToolButton("tool_clear", stringResource(R.string.tool_clear), null, onClear) { drawClearGlyph(it) }
             ToolButton(
                 "mute",
                 stringResource(if (muted) R.string.sound_on else R.string.sound_off),
-                false,
+                null,
                 onToggleMute,
             ) { drawSpeakerGlyph(it, muted) }
-            ToolButton("share", stringResource(R.string.share), false, onShare, enabled = shareEnabled) { drawShareGlyph(it) }
+            ToolButton("share", stringResource(R.string.share), null, onShare, enabled = shareEnabled) { drawShareGlyph(it) }
         }
     }
 }
 
+/** A tool the player picks ([selected] is true or false), or a one-off action ([selected] is null). */
 @Composable
 private fun ToolButton(
     tag: String,
     label: String,
-    selected: Boolean,
+    selected: Boolean?,
     onClick: () -> Unit,
     enabled: Boolean = true,
     glyph: DrawScope.(Color) -> Unit,
@@ -81,8 +83,14 @@ private fun ToolButton(
         modifier = Modifier
             .size(48.dp)
             .testTag(tag)
-            .background(if (selected) LeafDark.copy(alpha = 0.15f) else Color.Transparent, CircleShape)
-            .selectable(selected = selected, enabled = enabled, role = Role.Tab, onClick = onClick)
+            .background(if (selected == true) LeafDark.copy(alpha = 0.15f) else Color.Transparent, CircleShape)
+            .then(
+                if (selected != null) {
+                    Modifier.selectable(selected = selected, enabled = enabled, role = Role.Tab, onClick = onClick)
+                } else {
+                    Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                },
+            )
             .semantics { contentDescription = label }
             .alpha(if (enabled) 1f else 0.35f),
     ) {

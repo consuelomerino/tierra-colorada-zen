@@ -1,6 +1,14 @@
 package com.consuelomerino.tierracolorada.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.lifecycle.Lifecycle
+import com.consuelomerino.tierracolorada.R
+import com.consuelomerino.tierracolorada.storage.GardenStore
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -12,6 +20,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import kotlin.math.abs
 import com.consuelomerino.tierracolorada.MainActivity
@@ -41,6 +50,18 @@ class GardenScreenTest {
         settle()
         rule.onNodeWithTag("tool_smooth").assertIsSelected()
         rule.onNodeWithTag("tool_rake").assertIsNotSelected()
+    }
+
+    @Test fun actionsAreButtonsAndToolsAreTabs() {
+        // TalkBack must announce Clear, Mute and Share as buttons, not as tabs that can be selected.
+        val button = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+        val notSelectable = SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected)
+        for (tag in listOf("tool_clear", "mute", "share")) {
+            rule.onNodeWithTag(tag).assert(button).assert(notSelectable)
+        }
+        for (tag in listOf("tool_rake", "tool_place", "tool_smooth")) {
+            rule.onNodeWithTag(tag).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))
+        }
     }
 
     @Test fun clearAsksForConfirmation() {
@@ -104,5 +125,81 @@ class GardenScreenTest {
         val pixels = rule.onNodeWithTag("garden").captureToImage().toPixelMap()
         val c = pixels[pixels.width / 2, pixels.height / 2]
         assertTrue("expected red-ochre sand, got $c", c.red > c.green + 0.15f && c.red > c.blue + 0.15f)
+    }
+
+    @Test fun pinchingInAfterHittingMaxSizeShrinksRightAway() {
+        removeAllObjects()
+        rule.onNodeWithTag("tool_place").performClick()
+        rule.runOnUiThread { vm.addObject(ObjectType.STONE, 180f, 300f) }
+        settle()
+        val stone = vm.objects.single()
+        rule.onNodeWithTag("garden").performTouchInput {
+            val cell = width / 360f
+            val onStone = Offset(stone.x * cell, stone.y * cell)
+            down(0, onStone)
+            down(1, onStone + Offset(100f, 0f))
+            moveBy(1, Offset(400f, 0f)) // spread to 5x: the stone stops at 2x
+            moveBy(1, Offset(-100f, 0f)) // close a fifth of the way
+        }
+        settle()
+        val scale = vm.objects.single().scale
+        rule.onNodeWithTag("garden").performTouchInput { up(1); up(0) }
+        settle()
+        assertTrue("scale stuck at $scale", scale < 1.9f)
+    }
+
+    @Test fun holdingStillWithSmoothKeepsFlattening() {
+        removeAllObjects()
+        rule.onNodeWithTag("tool_smooth").performClick()
+        rule.runOnUiThread { vm.heights!![180, 300] = -0.8f }
+        settle()
+        rule.onNodeWithTag("garden").performTouchInput {
+            val cell = width / 360f
+            down(Offset(180.5f * cell, 300.5f * cell))
+        }
+        rule.mainClock.advanceTimeBy(300) // about 18 frames with the finger still
+        val depth = vm.heights!![180, 300]
+        rule.onNodeWithTag("garden").performTouchInput { up() }
+        settle()
+        assertTrue("groove only smoothed to $depth", depth > -0.1f)
+    }
+
+    @Test fun cancelledRakeStrokeEndsTheStroke() {
+        removeAllObjects()
+        rule.onNodeWithTag("garden").performTouchInput {
+            down(Offset(100f, 400f))
+            moveBy(Offset(150f, 0f))
+        }
+        rule.mainClock.advanceTimeBy(100)
+        assertTrue(vm.raking)
+        rule.onNodeWithTag("garden").performTouchInput { cancel() }
+        settle()
+        assertFalse("still raking after the gesture was cancelled, so the scrape keeps looping", vm.raking)
+    }
+
+    @Test fun cancelledSmoothStrokeStopsSmoothing() {
+        removeAllObjects()
+        rule.onNodeWithTag("tool_smooth").performClick()
+        settle()
+        rule.onNodeWithTag("garden").performTouchInput { down(Offset(100f, 400f)) }
+        rule.mainClock.advanceTimeBy(100)
+        rule.onNodeWithTag("garden").performTouchInput { cancel() }
+        settle()
+        assertFalse(vm.smoothing)
+    }
+
+    @Test fun muteSurvivesRecreationAndIsSaved() {
+        if (vm.muted) rule.onNodeWithTag("mute").performClick() // start unmuted
+        settle()
+        rule.onNodeWithTag("mute").performClick()
+        settle()
+        rule.activityRule.scenario.recreate() // e.g. a theme or language change
+        settle()
+        assertTrue(vm.muted)
+        rule.onNodeWithTag("mute").assertContentDescriptionEquals(rule.activity.getString(R.string.sound_on))
+        // Going to the background saves, so the setting also survives the app being closed.
+        rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        val saved = GardenStore(rule.activity.filesDir).load(vm.heights!!.width, vm.heights!!.height)
+        assertTrue("mute was not saved", saved?.muted == true)
     }
 }

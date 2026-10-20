@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
@@ -52,14 +53,19 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.consuelomerino.tierracolorada.R
 import com.consuelomerino.tierracolorada.life.LifeDirector
 import com.consuelomerino.tierracolorada.life.LifeState
+import com.consuelomerino.tierracolorada.life.PondRipples
 import com.consuelomerino.tierracolorada.life.drawLife
 import com.consuelomerino.tierracolorada.objects.GardenObject
+import com.consuelomerino.tierracolorada.objects.GardenObjects
 import com.consuelomerino.tierracolorada.objects.ObjectType
 import com.consuelomerino.tierracolorada.objects.drawGardenObject
-import com.consuelomerino.tierracolorada.sand.CellRect
 import com.consuelomerino.tierracolorada.sand.HeightMap
 import com.consuelomerino.tierracolorada.sand.SandShader
 import com.consuelomerino.tierracolorada.share.GardenSharer
+import com.consuelomerino.tierracolorada.share.ShareContent
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /** The most recent frame of ambient life, kept so a shared picture can include it. */
@@ -87,6 +93,8 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
     val lifeSnapshot = remember { LifeSnapshot() }
     val context = LocalContext.current
     val appName = stringResource(R.string.app_name)
+    val scope = rememberCoroutineScope()
+    var sharing by remember { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize().testTag("garden")) {
         val widthPx = constraints.maxWidth
@@ -150,16 +158,24 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
             Toolbar(
                 tool = viewModel.tool,
                 muted = viewModel.muted,
-                shareEnabled = true,
+                shareEnabled = !sharing,
                 onSelectTool = viewModel::selectTool,
                 onClear = viewModel::requestClear,
                 onToggleMute = viewModel::toggleMute,
                 onShare = {
-                    val image = GardenSharer.render(
-                        widthPx, heightPx, fullSandImage(heights), viewModel.objects, lifeSnapshot.state,
-                        viewModel.pondRipples.active(lifeSnapshot.nowMs), lifeSnapshot.nowMs, appName,
+                    val content = ShareContent(
+                        widthPx, heightPx, HeightMap(heights.width, heights.height, heights.values.copyOf()),
+                        viewModel.objects, lifeSnapshot.state, viewModel.pondRipples.active(lifeSnapshot.nowMs),
+                        lifeSnapshot.nowMs, appName,
                     )
-                    GardenSharer.share(context, image)
+                    sharing = true
+                    scope.launch {
+                        try {
+                            GardenSharer.openShareSheet(context, GardenSharer.createImageFile(context, content))
+                        } finally {
+                            sharing = false
+                        }
+                    }
                 },
             )
         }
@@ -182,6 +198,12 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
             confirmButton = { TextButton(onClick = viewModel::confirmClear) { Text(stringResource(R.string.clear_confirm)) } },
             dismissButton = { TextButton(onClick = viewModel::cancelClear) { Text(stringResource(R.string.cancel)) } },
         )
+    }
+
+    if (viewModel.smoothing) {
+        LaunchedEffect(Unit) {
+            while (viewModel.smoothing) withFrameMillis { viewModel.smoothFrame() }
+        }
     }
 
     if (viewModel.clearing) {
@@ -234,14 +256,18 @@ private fun SandCanvas(
                         }
                         else -> {
                             viewModel.strokeStart(cell.x, cell.y)
-                            val moved = followUntilUp(down, tapSlopPx) { change ->
-                                viewModel.strokeMove(
-                                    change.position.x / cellSize,
-                                    change.position.y / cellSize,
-                                    change.uptimeMillis - change.previousUptimeMillis,
-                                )
+                            // End the stroke even if the gesture is cancelled, so the scrape and the brush stop.
+                            val moved = try {
+                                followUntilUp(down, tapSlopPx) { change ->
+                                    viewModel.strokeMove(
+                                        change.position.x / cellSize,
+                                        change.position.y / cellSize,
+                                        change.uptimeMillis - change.previousUptimeMillis,
+                                    )
+                                }
+                            } finally {
+                                viewModel.strokeEnd()
                             }
-                            viewModel.strokeEnd()
                             if (!moved) viewModel.tap(cell.x, cell.y)
                         }
                     }
@@ -275,11 +301,26 @@ private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: 
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
     val director = remember(heights) { LifeDirector(Random.Default, heights.width, heights.height) }
+    // In wall-clock milliseconds, the time base of pond taps.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
+    LaunchedEffect(lifecycleOwner, reducedMotion) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) withFrameMillis { now = System.currentTimeMillis() }
+            if (reducedMotion) {
+                // Nothing moves, so draw no frames: show a tapped ripple still, and redraw once it has gone.
+                viewModel.events.filter { it == GardenEvent.WaterTap }.collect {
+                    now = System.currentTimeMillis()
+                    launch {
+                        delay(PondRipples.LIFETIME_MS)
+                        now = System.currentTimeMillis()
+                    }
+                }
+            } else {
+                // Frame time keeps motion even from frame to frame; the wall clock only anchors it once.
+                val wallStart = System.currentTimeMillis()
+                val frameStart = withFrameMillis { it }
+                while (true) withFrameMillis { frame -> now = wallStart + (frame - frameStart) }
+            }
         }
     }
     Canvas(Modifier.fillMaxSize().graphicsLayer()) {
@@ -288,15 +329,6 @@ private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: 
         snapshot.state = state
         snapshot.nowMs = now
         drawLife(state, viewModel.pondRipples.active(now), now, cellSize, objects.firstOrNull { it.type == ObjectType.POND })
-    }
-}
-
-/** Shades the whole sand surface into a fresh image (for sharing). */
-private fun fullSandImage(heights: HeightMap): ImageBitmap {
-    val pixels = IntArray(heights.width * heights.height)
-    SandShader.shade(heights, CellRect(0, 0, heights.width, heights.height), pixels)
-    return ImageBitmap(heights.width, heights.height).also {
-        it.asAndroidBitmap().setPixels(pixels, 0, heights.width, 0, 0, heights.width, heights.height)
     }
 }
 
@@ -354,7 +386,8 @@ private suspend fun AwaitPointerEventScope.moveObjectGesture(
         }
         if (moving) {
             if (pressed >= 2) {
-                zoom *= event.calculateZoom()
+                // Keep the zoom within the size limits, so pinching back in after hitting one responds at once.
+                zoom = (zoom * event.calculateZoom()).coerceIn(GardenObjects.MIN_SCALE / target.scale, GardenObjects.MAX_SCALE / target.scale)
                 rotationDegrees += event.calculateRotation()
                 viewModel.transformObject(target.id, target.scale * zoom, target.rotation + Math.toRadians(rotationDegrees.toDouble()).toFloat())
             } else {
