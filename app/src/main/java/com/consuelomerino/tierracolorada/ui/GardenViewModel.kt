@@ -24,6 +24,7 @@ import java.io.File
 import java.io.IOException
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -63,10 +64,15 @@ class GardenViewModel(
     /** True while a Smooth stroke is down; the screen then calls [smoothFrame] once per frame. */
     var smoothing by mutableStateOf(false)
         private set
+    /** True while a Rake stroke is down; scrape speeds that arrive after it ends are stale. */
+    var raking = false
+        private set
 
     val pondRipples = PondRipples()
 
-    private val _events = MutableSharedFlow<GardenEvent>(extraBufferCapacity = 16)
+    // When the listener falls behind, drop the oldest events: the newest ones (like the stop at the
+    // end of a rake stroke) matter most.
+    private val _events = MutableSharedFlow<GardenEvent>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<GardenEvent> = _events
 
     private lateinit var garden: GardenObjects
@@ -108,6 +114,7 @@ class GardenViewModel(
         when (tool) {
             Tool.RAKE -> {
                 rakeTravel = 0f
+                raking = true
                 rake.beginStroke(x, y)
                 sandChanged()
             }
@@ -152,8 +159,9 @@ class GardenViewModel(
 
     fun strokeEnd() {
         smoothing = false
-        if (tool == Tool.RAKE && heights != null) {
+        if (raking) {
             rake.endStroke()
+            raking = false
             _events.tryEmit(GardenEvent.RakeSpeed(0f))
         }
     }

@@ -5,6 +5,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -94,6 +95,32 @@ class GardenViewModelTest {
         val vm2 = GardenViewModel(GardenStore(dir))
         vm2.initialize(360, 800)
         assertTrue(vm2.muted)
+    }
+
+    @Test fun rakingIsTrueOnlyDuringARakeStroke() {
+        vm.initialize(360, 800)
+        assertFalse(vm.raking)
+        vm.strokeStart(50f, 50f)
+        assertTrue(vm.raking)
+        vm.strokeMove(90f, 50f, 16)
+        vm.strokeEnd()
+        assertFalse(vm.raking)
+    }
+
+    @Test fun stopScrapeIsDeliveredEvenWhenTheListenerFallsBehind() = runTest {
+        vm.initialize(360, 800)
+        val speeds = mutableListOf<Float>()
+        // A collector that only runs when the test scheduler advances, like a busy main thread.
+        val job = launch(StandardTestDispatcher(testScheduler)) {
+            vm.events.collect { if (it is GardenEvent.RakeSpeed) speeds += it.cellsPerSecond }
+        }
+        testScheduler.runCurrent() // subscribe
+        vm.strokeStart(10f, 100f)
+        repeat(40) { vm.strokeMove(10f + (it + 1) * 5f, 100f, 16) }
+        vm.strokeEnd()
+        testScheduler.runCurrent()
+        job.cancel()
+        assertEquals("the final event must stop the scrape", 0f, speeds.last())
     }
 
     @Test fun hapticTickEvery24Cells() = runTest {

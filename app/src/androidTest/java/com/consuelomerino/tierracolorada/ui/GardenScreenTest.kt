@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import kotlin.math.abs
 import com.consuelomerino.tierracolorada.MainActivity
@@ -146,5 +147,29 @@ class GardenScreenTest {
         rule.onNodeWithTag("garden").performTouchInput { up() }
         settle()
         assertTrue("groove only smoothed to $depth", depth > -0.1f)
+    }
+
+    @Test fun cancelledRakeStrokeEndsTheStroke() {
+        removeAllObjects()
+        rule.onNodeWithTag("garden").performTouchInput {
+            down(Offset(100f, 400f))
+            moveBy(Offset(150f, 0f))
+        }
+        rule.mainClock.advanceTimeBy(100)
+        assertTrue(vm.raking)
+        rule.onNodeWithTag("garden").performTouchInput { cancel() }
+        settle()
+        assertFalse("still raking after the gesture was cancelled, so the scrape keeps looping", vm.raking)
+    }
+
+    @Test fun cancelledSmoothStrokeStopsSmoothing() {
+        removeAllObjects()
+        rule.onNodeWithTag("tool_smooth").performClick()
+        settle()
+        rule.onNodeWithTag("garden").performTouchInput { down(Offset(100f, 400f)) }
+        rule.mainClock.advanceTimeBy(100)
+        rule.onNodeWithTag("garden").performTouchInput { cancel() }
+        settle()
+        assertFalse(vm.smoothing)
     }
 }

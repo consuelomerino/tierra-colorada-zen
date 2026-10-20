@@ -236,14 +236,18 @@ private fun SandCanvas(
                         }
                         else -> {
                             viewModel.strokeStart(cell.x, cell.y)
-                            val moved = followUntilUp(down, tapSlopPx) { change ->
-                                viewModel.strokeMove(
-                                    change.position.x / cellSize,
-                                    change.position.y / cellSize,
-                                    change.uptimeMillis - change.previousUptimeMillis,
-                                )
+                            // End the stroke even if the gesture is cancelled, so the scrape and the brush stop.
+                            val moved = try {
+                                followUntilUp(down, tapSlopPx) { change ->
+                                    viewModel.strokeMove(
+                                        change.position.x / cellSize,
+                                        change.position.y / cellSize,
+                                        change.uptimeMillis - change.previousUptimeMillis,
+                                    )
+                                }
+                            } finally {
+                                viewModel.strokeEnd()
                             }
-                            viewModel.strokeEnd()
                             if (!moved) viewModel.tap(cell.x, cell.y)
                         }
                     }
