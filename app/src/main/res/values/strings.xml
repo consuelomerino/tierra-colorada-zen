@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Tierra Colorada - Zen</string>
+    <string name="tool_rake">Rake</string>
+    <string name="tool_place">Place</string>
+    <string name="tool_smooth">Smooth</string>
+    <string name="tool_clear">Clear all</string>
+    <string name="sound_off">Mute</string>
+    <string name="sound_on">Sound on</string>
+    <string name="share">Share</string>
+    <string name="clear_title">Clear the garden?</string>
+    <string name="clear_message">All the sand will be smoothed. Your objects stay in place.</string>
+    <string name="clear_confirm">Clear</string>
+    <string name="cancel">Cancel</string>
+    <string name="object_stone">Stone</string>
+    <string name="object_fern">Fern</string>
+    <string name="object_heliconia">Heliconia</string>
+    <string name="object_pond">Pond</string>
+    <string name="garden_full">Your garden is full (30 objects)</string>
+    <string name="remove">Remove</string>
+    <string name="share_title">Share your garden</string>
+</resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tool_rake">Rastrillo</string>
+    <string name="tool_place">Colocar</string>
+    <string name="tool_smooth">Alisar</string>
+    <string name="tool_clear">Borrar todo</string>
+    <string name="sound_off">Silenciar</string>
+    <string name="sound_on">Activar sonido</string>
+    <string name="share">Compartir</string>
+    <string name="clear_title">¿Borrar el jardín?</string>
+    <string name="clear_message">Toda la arena quedará lisa. Tus objetos se quedan en su lugar.</string>
+    <string name="clear_confirm">Borrar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="object_stone">Piedra</string>
+    <string name="object_fern">Helecho</string>
+    <string name="object_heliconia">Heliconia</string>
+    <string name="object_pond">Estanque</string>
+    <string name="garden_full">Tu jardín está lleno (30 objetos)</string>
+    <string name="remove">Quitar</string>
+    <string name="share_title">Comparte tu jardín</string>
+</resources>
