@@ -76,4 +76,13 @@ class GardenObjectsTest {
         assertTrue(g.isBlocked(50, 50))
         assertFalse(g.isBlocked(80, 50))
     }
+
+    @Test fun coversMatchesTheCircleExactly() {
+        val o = GardenObject(1, ObjectType.POND, 50f, 60f, scale = 1.3f, seed = 0)
+        for (y in 0..120) for (x in 0..100) {
+            val cx = x + 0.5f
+            val cy = y + 0.5f
+            assertEquals("cell $x,$y", hypot(cx - o.x, cy - o.y) <= o.radius, o.covers(cx, cy))
+        }
+    }
 }
