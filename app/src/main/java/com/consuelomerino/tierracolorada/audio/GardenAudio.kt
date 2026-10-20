@@ -11,6 +11,9 @@ import com.consuelomerino.tierracolorada.R
 /** Rake scrape volume for a given rake speed: silent when still, up to 60 % when fast. */
 fun scrapeVolume(cellsPerSecond: Float): Float = (cellsPerSecond / 120f).coerceIn(0f, 1f) * 0.6f
 
+/** Only a visible, unmuted garden takes audio focus, so a muted garden never pauses the user's own music. */
+fun wantsAudioFocus(foreground: Boolean, muted: Boolean): Boolean = foreground && !muted
+
 enum class SoundEffect { STONE, WATER, SWEEP }
 
 /**
@@ -62,18 +65,19 @@ class GardenAudio(context: Context) {
 
     fun resume() {
         foreground = true
-        hasFocus = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        updateFocus()
         updatePlayback()
     }
 
     fun pause() {
         foreground = false
+        updateFocus()
         updatePlayback()
-        audioManager.abandonAudioFocusRequest(focusRequest)
     }
 
     fun setMuted(muted: Boolean) {
         this.muted = muted
+        updateFocus()
         updatePlayback()
     }
 
@@ -100,6 +104,17 @@ class GardenAudio(context: Context) {
         ambient?.release()
         soundPool.release()
         audioManager.abandonAudioFocusRequest(focusRequest)
+    }
+
+    private fun updateFocus() {
+        if (wantsAudioFocus(foreground, muted)) {
+            if (!hasFocus) {
+                hasFocus = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            }
+        } else if (hasFocus) {
+            audioManager.abandonAudioFocusRequest(focusRequest)
+            hasFocus = false
+        }
     }
 
     private fun stopScrape() {
