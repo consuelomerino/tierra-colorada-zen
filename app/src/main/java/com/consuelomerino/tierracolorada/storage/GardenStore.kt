@@ -23,6 +23,8 @@ class GardenStore(private val dir: File) {
     private val file get() = File(dir, FILE_NAME)
     private val tempFile get() = File(dir, "$FILE_NAME.tmp")
 
+    /** Writes the snapshot atomically. Calls are serialised so concurrent saves never share the temp file. */
+    @Synchronized
     fun save(snapshot: GardenSnapshot) {
         dir.mkdirs()
         val tmp = tempFile
@@ -54,6 +56,7 @@ class GardenStore(private val dir: File) {
     }
 
     /** Returns the saved garden fitted to the given grid size, or null if there is none or it cannot be read. */
+    @Synchronized
     fun load(gridWidth: Int, gridHeight: Int): GardenSnapshot? {
         val f = file
         if (!f.exists()) return null
@@ -70,7 +73,9 @@ class GardenStore(private val dir: File) {
         if (input.readInt() != VERSION) return invalid("unknown version")
         val width = input.readInt()
         val height = input.readInt()
-        if (width !in 1..MAX_DIMENSION || height !in 1..MAX_DIMENSION) return invalid("bad size")
+        if (width !in 1..MAX_DIMENSION || height !in 1..MAX_DIMENSION || width.toLong() * height > MAX_CELLS) {
+            return invalid("bad size")
+        }
         val compressedSize = input.readInt()
         if (compressedSize !in 0..fileLength) return invalid("bad data length")
         val compressed = ByteArray(compressedSize).also { input.readFully(it) }
@@ -147,6 +152,8 @@ class GardenStore(private val dir: File) {
         private const val MAGIC = 0x54435A31 // "TCZ1"
         private const val VERSION = 1
         private const val MAX_DIMENSION = 10_000
+        /** Far above any real garden (360 × ~1100) and small enough to allocate safely on a phone. */
+        private const val MAX_CELLS = 4_000_000L
         private const val MAX_OBJECTS_IN_FILE = 1_000
     }
 }

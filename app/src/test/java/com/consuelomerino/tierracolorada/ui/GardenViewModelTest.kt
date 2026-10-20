@@ -82,4 +82,16 @@ class GardenViewModelTest {
         job.cancel()
         assertTrue("ticks = ${ticks.size}", ticks.size in 2..4)
     }
+
+    @Test fun failedSaveDoesNotCrashAndStaysPending() {
+        val blocked = File(temp.root, "not-a-dir").apply { writeText("x") }
+        val failing = GardenViewModel(GardenStore(blocked))
+        failing.initialize(360, 800)
+        failing.toggleMute()
+        failing.saveNow() // must not throw even though the directory is a file
+        blocked.delete(); blocked.mkdirs()
+        failing.saveNow() // the change is still pending, so this save writes it
+        val reloaded = GardenViewModel(GardenStore(blocked)).apply { initialize(360, 800) }
+        assertTrue(reloaded.muted)
+    }
 }

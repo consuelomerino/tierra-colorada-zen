@@ -64,4 +64,24 @@ class GardenStoreTest {
         store.save(GardenSnapshot(HeightMap(10, 10), emptyList(), false))
         assertFalse(File(dir, "garden.bin.tmp").exists())
     }
+
+    @Test fun oversizedGridIsRejectedBeforeAllocating() {
+        // A real garden grid is 360 wide and at most ~1100 tall; a header claiming millions of cells
+        // must be refused before the app tries to allocate it (a phone would run out of memory).
+        store.save(GardenSnapshot(HeightMap(3000, 3000), emptyList(), false))
+        assertNull(store.load(360, 800))
+    }
+
+    @Test fun concurrentSavesNeverLeaveAnUnreadableFile() {
+        val a = GardenSnapshot(HeightMap(360, 800).apply { values.fill(-0.3f) }, emptyList(), false)
+        val b = GardenSnapshot(HeightMap(360, 800).apply { values.fill(0.2f) }, emptyList(), true)
+        val errors = java.util.Collections.synchronizedList(mutableListOf<Throwable>())
+        val threads = List(4) { i ->
+            Thread { repeat(15) { runCatching { store.save(if (i % 2 == 0) a else b) }.onFailure { errors += it } } }
+        }
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+        assertTrue("save threw: $errors", errors.isEmpty())
+        assertTrue(store.load(360, 800) != null)
+    }
 }

@@ -1,5 +1,6 @@
 package com.consuelomerino.tierracolorada.ui
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,7 @@ import com.consuelomerino.tierracolorada.sand.SandTools
 import com.consuelomerino.tierracolorada.storage.GardenSnapshot
 import com.consuelomerino.tierracolorada.storage.GardenStore
 import java.io.File
+import java.io.IOException
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -68,7 +70,7 @@ class GardenViewModel(
     private lateinit var rake: Rake
     private var sweep: ClearSweep? = null
     private var rakeTravel = 0f
-    private var unsaved = false
+    @Volatile private var unsaved = false
 
     init {
         viewModelScope.launch {
@@ -225,12 +227,22 @@ class GardenViewModel(
 
     /** Saves right away if anything changed since the last save. */
     fun saveNow() {
-        snapshotIfUnsaved()?.let { store.save(it) }
+        snapshotIfUnsaved()?.let { trySave(it) }
     }
 
     private suspend fun saveInBackground() {
         val snapshot = snapshotIfUnsaved() ?: return
-        withContext(Dispatchers.IO) { store.save(snapshot) }
+        withContext(Dispatchers.IO) { trySave(snapshot) }
+    }
+
+    /** A failed save (e.g. a full disk) must never crash the game; the change stays pending for the next try. */
+    private fun trySave(snapshot: GardenSnapshot) {
+        try {
+            store.save(snapshot)
+        } catch (e: IOException) {
+            Log.w(TAG, "Could not save the garden; will retry", e)
+            unsaved = true
+        }
     }
 
     private fun snapshotIfUnsaved(): GardenSnapshot? {
@@ -247,6 +259,7 @@ class GardenViewModel(
     }
 
     companion object {
+        private const val TAG = "GardenViewModel"
         const val AUTOSAVE_INTERVAL_MS = 30_000L
         const val HAPTIC_TICK_CELLS = 24f
 
