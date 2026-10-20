@@ -220,7 +220,7 @@ private fun SandCanvas(
                         null
                     }
                     when {
-                        target != null -> moveObjectGesture(viewModel, target, down, cellSize, onMoveStart, onMove, onMoveEnd)
+                        target != null -> moveObjectGesture(viewModel, target, down, cellSize, tapSlopPx, onMoveStart, onMove, onMoveEnd)
                         viewModel.tool == Tool.PLACE -> {
                             if (!followUntilUp(down, tapSlopPx) {}) viewModel.tap(cell.x, cell.y)
                         }
@@ -316,12 +316,17 @@ private suspend fun AwaitPointerEventScope.followUntilUp(
     return moved
 }
 
-/** Drag with one finger to move an object; pinch with two to resize and rotate it. */
+/**
+ * Drag with one finger to move an object; pinch with two to resize and rotate it.
+ * Only the finger that grabbed the object moves it, and the move ends when that finger lifts.
+ * A touch that never moves past [slop] is a tap on the object instead.
+ */
 private suspend fun AwaitPointerEventScope.moveObjectGesture(
     viewModel: GardenViewModel,
     target: GardenObject,
     down: PointerInputChange,
     cellSize: Float,
+    slop: Float,
     onMoveStart: (Long, Offset) -> Unit,
     onMove: (Offset) -> Unit,
     onMoveEnd: (Long) -> Unit,
@@ -329,22 +334,33 @@ private suspend fun AwaitPointerEventScope.moveObjectGesture(
     val grab = Offset(target.x, target.y) - down.position / cellSize
     var zoom = 1f
     var rotationDegrees = 0f
-    onMoveStart(target.id, down.position)
+    var moving = false
     while (true) {
         val event = awaitPointerEvent()
-        val pressed = event.changes.filter { it.pressed }
-        if (pressed.isEmpty()) break
-        if (pressed.size >= 2) {
-            zoom *= event.calculateZoom()
-            rotationDegrees += event.calculateRotation()
-            viewModel.transformObject(target.id, target.scale * zoom, target.rotation + Math.toRadians(rotationDegrees.toDouble()).toFloat())
-        } else {
-            val finger = pressed.first().position
-            val cell = finger / cellSize + grab
-            viewModel.moveObject(target.id, cell.x, cell.y)
-            onMove(finger)
+        val grabbing = event.changes.firstOrNull { it.id == down.id }
+        if (grabbing == null || !grabbing.pressed) break
+        val pressed = event.changes.count { it.pressed }
+        if (!moving && (pressed >= 2 || (grabbing.position - down.position).getDistance() > slop)) {
+            moving = true
+            onMoveStart(target.id, grabbing.position)
+        }
+        if (moving) {
+            if (pressed >= 2) {
+                zoom *= event.calculateZoom()
+                rotationDegrees += event.calculateRotation()
+                viewModel.transformObject(target.id, target.scale * zoom, target.rotation + Math.toRadians(rotationDegrees.toDouble()).toFloat())
+            } else {
+                val cell = grabbing.position / cellSize + grab
+                viewModel.moveObject(target.id, cell.x, cell.y)
+                onMove(grabbing.position)
+            }
         }
         event.changes.forEach { it.consume() }
     }
-    onMoveEnd(target.id)
+    if (moving) {
+        onMoveEnd(target.id)
+    } else {
+        val cell = down.position / cellSize
+        viewModel.tap(cell.x, cell.y)
+    }
 }
