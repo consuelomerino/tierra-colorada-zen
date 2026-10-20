@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tierra Colorada - Zen</title>
+<meta name="description" content="Un jardín zen en tierra colorada, inspirado en la selva de América Latina. A zen garden on red earth, inspired by Latin American rainforests. Free for Android.">
+<meta property="og:title" content="Tierra Colorada - Zen">
+<meta property="og:description" content="Rastrilla, decora y respira con la selva. Rake, decorate and breathe with the rainforest.">
+<meta property="og:image" content="https://consuelomerino.github.io/tierra-colorada-zen/assets/feature.jpg">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<style>
+  :root {
+    --sand: #B5523B;
+    --sand-dark: #7E3322;
+    --sand-light: #CF6F55;
+    --leaf: #1F4D2E;
+    --leaf-light: #4F8A3C;
+    --cream: #F7F1E8;
+    --ink: #2A1A14;
+    --muted: #6B5249;
+    --card: #FFFFFF;
+    --bg: var(--cream);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1C1411; --card: #2A1E1A; --ink: #F7F1E8; --muted: #CDB8AE; --leaf: #8CC57A; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 "Avenir Next", "Segoe UI", system-ui, sans-serif; }
+  a { color: inherit; }
+
+  .hero {
+    background:
+      repeating-radial-gradient(ellipse at 50% 120%, transparent 0 22px, rgba(126,51,34,.55) 22px 25px, rgba(207,111,85,.45) 25px 27px),
+      var(--sand);
+    color: var(--cream);
+    padding: 20px 16px 56px;
+    text-align: center;
+  }
+  .lang { display: flex; justify-content: flex-end; gap: 6px; max-width: 960px; margin: 0 auto; }
+  .lang button {
+    font: inherit; font-size: 14px; color: var(--cream); background: rgba(0,0,0,.18);
+    border: 1px solid rgba(247,241,232,.5); border-radius: 999px; padding: 4px 12px; cursor: pointer; min-height: 32px;
+  }
+  .lang button[aria-pressed="true"] { background: var(--cream); color: var(--sand-dark); }
+  .hero img.icon { width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 8px 24px rgba(0,0,0,.3); margin-top: 24px; }
+  h1 { font-size: clamp(30px, 7vw, 46px); line-height: 1.15; margin: 18px 0 6px; letter-spacing: .5px; }
+  .tagline { font-size: clamp(17px, 4vw, 21px); margin: 0 auto; max-width: 560px; opacity: .95; }
+  .badge {
+    display: inline-block; margin-top: 26px; padding: 10px 20px; border-radius: 999px;
+    background: var(--cream); color: var(--sand-dark); font-weight: 600; font-size: 15px;
+  }
+
+  main { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  .feature { display: block; width: 100%; height: auto; border-radius: 16px; margin: -28px auto 0; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  section { margin: 48px 0; }
+  h2 { font-size: 24px; margin: 0 0 12px; color: var(--leaf); }
+  .intro { font-size: 18px; max-width: 680px; }
+  ul.features { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  ul.features li { background: var(--card); border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  ul.features li strong { display: block; color: var(--leaf); }
+  .shots { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+  .shots img { width: 220px; height: auto; flex: 0 0 auto; border-radius: 22px; scroll-snap-align: start; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+  .promise { background: var(--card); border-left: 5px solid var(--leaf-light); border-radius: 12px; padding: 16px 18px; }
+  footer { border-top: 1px solid rgba(107,82,73,.25); margin-top: 56px; padding: 24px 16px 40px; text-align: center; color: var(--muted); font-size: 15px; }
+  footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin-bottom: 10px; }
+
+  [data-lang] { display: none; }
+  html[lang="es"] [data-lang="es"], html[lang="en"] [data-lang="en"] { display: revert; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="lang" role="group" aria-label="Idioma / Language">
+    <button type="button" data-set-lang="es" aria-pressed="true">Español</button>
+    <button type="button" data-set-lang="en" aria-pressed="false">English</button>
+  </div>
+  <img class="icon" src="assets/icon.png" alt="" width="112" height="112">
+  <h1>Tierra Colorada - Zen</h1>
+  <p class="tagline">
+    <span data-lang="es">Un jardín zen en tierra colorada. Rastrilla, decora y respira con la selva.</span>
+    <span data-lang="en">A zen garden on red earth. Rake, decorate and breathe with the rainforest.</span>
+  </p>
+  <span class="badge">
+    <span data-lang="es">Próximamente en Google Play · Gratis</span>
+    <span data-lang="en">Coming soon on Google Play · Free</span>
+  </span>
+</header>
+
+<main>
+  <img class="feature" src="assets/feature.jpg" width="1024" height="500"
+       alt="Jardín de tierra roja rastrillada con una piedra, una heliconia con un colibrí y un estanque / Raked red-earth garden with a stone, a heliconia with a hummingbird, and a pond">
+
+  <section>
+    <p class="intro" data-lang="es">
+      Tierra Colorada - Zen es un jardín para relajarte, inspirado en la tierra roja y la selva de América Latina.
+      Dibuja con el dedo y el rastrillo deja surcos que siguen tu mano. Coloca piedras, helechos, heliconias y un estanque.
+      Después, simplemente mira: la sombra de las hojas pasa despacio y, si plantaste una heliconia, un colibrí viene a visitarla.
+    </p>
+    <p class="intro" data-lang="en">
+      Tierra Colorada - Zen is a garden to relax in, inspired by the red earth and rainforests of Latin America.
+      Draw with your finger and the rake leaves grooves that follow your hand. Set stones, ferns, heliconias and a pond.
+      Then just watch: leaf shadows drift slowly by, and if you planted a heliconia, a hummingbird comes to visit.
+    </p>
+  </section>
+
+  <section>
+    <h2><span data-lang="es">En el jardín</span><span data-lang="en">In the garden</span></h2>
+    <ul class="features">
+      <li data-lang="es"><strong>Rastrilla</strong>Un rastrillo de cuatro dientes deja surcos en relieve.</li>
+      <li data-lang="en"><strong>Rake</strong>A four-tine rake leaves sculpted grooves.</li>
+      <li data-lang="es"><strong>Decora</strong>Piedras, helechos, heliconias y un estanque que puedes mover, agrandar y girar.</li>
+      <li data-lang="en"><strong>Decorate</strong>Stones, ferns, heliconias and a pond you can move, resize and rotate.</li>
+      <li data-lang="es"><strong>Mira cómo vive</strong>Sombras del dosel, hojas que caen, ondas en el agua y colibríes.</li>
+      <li data-lang="en"><strong>Watch it live</strong>Canopy shadows, falling leaves, pond ripples and hummingbirds.</li>
+      <li data-lang="es"><strong>Escucha la selva</strong>Lluvia suave y pájaros de fondo, con opción de silencio.</li>
+      <li data-lang="en"><strong>Hear the rainforest</strong>Soft rain and birdsong, with a mute switch.</li>
+      <li data-lang="es"><strong>Se guarda solo</strong>Tu jardín te espera tal como lo dejaste. Comparte una foto cuando quieras.</li>
+      <li data-lang="en"><strong>Saves itself</strong>Your garden waits just as you left it. Share a picture whenever you like.</li>
+      <li data-lang="es"><strong>En español e inglés</strong>Y con soporte para lectores de pantalla.</li>
+      <li data-lang="en"><strong>Spanish and English</strong>With screen-reader support.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span data-lang="es">Capturas</span><span data-lang="en">Screenshots</span></h2>
+    <div class="shots">
+      <img src="assets/1-garden.jpg" width="540" height="1080" loading="lazy"
+           alt="Jardín rastrillado con piedras, helechos, heliconias y un estanque / Raked garden with stones, ferns, heliconias and a pond">
+      <img src="assets/2-place.jpg" width="540" height="1080" loading="lazy"
+           alt="Bandeja para colocar piedras, helechos, heliconias y el estanque / Tray for placing stones, ferns, heliconias and the pond">
+      <img src="assets/3-hummingbird.jpg" width="540" height="1080" loading="lazy"
+           alt="Un colibrí visita una heliconia / A hummingbird visits a heliconia">
+    </div>
+  </section>
+
+  <section>
+    <p class="promise" data-lang="es">
+      <strong>Gratis, sin anuncios y sin compras.</strong> Funciona sin internet y no recopila ningún dato.
+      Si en tu teléfono desactivaste las animaciones, el jardín se queda quieto.
+    </p>
+    <p class="promise" data-lang="en">
+      <strong>Free, no ads, no purchases.</strong> Works offline and collects no data.
+      If you've turned off animations on your phone, the garden stays still.
+    </p>
+  </section>
+</main>
+
+<footer>
+  <nav>
+    <a href="privacy-policy.html"><span data-lang="es">Política de privacidad</span><span data-lang="en">Privacy policy</span></a>
+    <a href="https://github.com/consuelomerino/tierra-colorada-zen"><span data-lang="es">Código fuente</span><span data-lang="en">Source code</span></a>
+    <a href="https://github.com/consuelomerino/tierra-colorada-zen/issues"><span data-lang="es">Contacto y sugerencias</span><span data-lang="en">Contact and feedback</span></a>
+  </nav>
+  <div>© 2026 Consuelo Merino</div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    function setLang(lang) {
+      root.lang = lang;
+      document.querySelectorAll('[data-set-lang]').forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.setLang === lang));
+      });
+      try { localStorage.setItem('lang', lang); } catch (e) {}
+    }
+    var saved = null;
+    try { saved = localStorage.getItem('lang'); } catch (e) {}
+    var browser = (navigator.language || 'es').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
+    setLang(saved === 'es' || saved === 'en' ? saved : browser);
+    document.querySelectorAll('[data-set-lang]').forEach(function (b) {
+      b.addEventListener('click', function () { setLang(b.dataset.setLang); });
+    });
+  })();
+</script>
+</body>
+</html>
