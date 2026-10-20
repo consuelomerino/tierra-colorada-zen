@@ -53,6 +53,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.consuelomerino.tierracolorada.R
 import com.consuelomerino.tierracolorada.life.LifeDirector
 import com.consuelomerino.tierracolorada.life.LifeState
+import com.consuelomerino.tierracolorada.life.PondRipples
 import com.consuelomerino.tierracolorada.life.drawLife
 import com.consuelomerino.tierracolorada.objects.GardenObject
 import com.consuelomerino.tierracolorada.objects.GardenObjects
@@ -62,6 +63,8 @@ import com.consuelomerino.tierracolorada.sand.HeightMap
 import com.consuelomerino.tierracolorada.sand.SandShader
 import com.consuelomerino.tierracolorada.share.GardenSharer
 import com.consuelomerino.tierracolorada.share.ShareContent
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -293,11 +296,26 @@ private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: 
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
     val director = remember(heights) { LifeDirector(Random.Default, heights.width, heights.height) }
+    // In wall-clock milliseconds, the time base of pond taps.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
+    LaunchedEffect(lifecycleOwner, reducedMotion) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) withFrameMillis { now = System.currentTimeMillis() }
+            if (reducedMotion) {
+                // Nothing moves, so draw no frames: show a tapped ripple still, and redraw once it has gone.
+                viewModel.events.filter { it == GardenEvent.WaterTap }.collect {
+                    now = System.currentTimeMillis()
+                    launch {
+                        delay(PondRipples.LIFETIME_MS)
+                        now = System.currentTimeMillis()
+                    }
+                }
+            } else {
+                // Frame time keeps motion even from frame to frame; the wall clock only anchors it once.
+                val wallStart = System.currentTimeMillis()
+                val frameStart = withFrameMillis { it }
+                while (true) withFrameMillis { frame -> now = wallStart + (frame - frameStart) }
+            }
         }
     }
     Canvas(Modifier.fillMaxSize().graphicsLayer()) {
