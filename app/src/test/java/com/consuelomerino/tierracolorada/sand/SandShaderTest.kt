@@ -36,4 +36,19 @@ class SandShaderTest {
         SandShader.shade(m, CellRect(0, 0, 1, 1), out)
         assertEquals(0, out[8])
     }
+
+    @Test fun incrementalShadingMatchesFullShadingAcrossFrameBoundaries() {
+        val m = HeightMap(40, 10)
+        for (x in 0 until 40) for (y in 0 until 10) m[x, y] = if (y % 3 == 0) -0.8f else 0.3f
+        val incremental = IntArray(400)
+        SandShader.shade(m, m.takeDirty()!!, incremental)
+        // Clear in two "frames", shading only what each frame changed, like the clear sweep does.
+        for (x in 0..9) for (y in 0 until 10) m[x, y] = 0f
+        SandShader.shade(m, m.takeDirty()!!, incremental)
+        for (x in 10..19) for (y in 0 until 10) m[x, y] = 0f
+        SandShader.shade(m, m.takeDirty()!!, incremental)
+        val full = IntArray(400)
+        SandShader.shade(m, CellRect(0, 0, 40, 10), full)
+        assertEquals(full.toList(), incremental.toList())
+    }
 }

@@ -13,10 +13,14 @@ object SandShader {
     private val baseGreen = (BASE_COLOR shr 8) and 0xFF
     private val baseBlue = BASE_COLOR and 0xFF
 
-    /** Writes opaque ARGB pixels for the cells in [rect] into [out], indexed `y * map.width + x`. */
+    /**
+     * Writes opaque ARGB pixels for the cells in [rect] into [out], indexed `y * map.width + x`.
+     * A cell's colour depends on its down-right neighbour, so the column left of and the row
+     * above [rect] are re-shaded too.
+     */
     fun shade(map: HeightMap, rect: CellRect, out: IntArray) {
-        for (y in rect.top until rect.bottom) {
-            for (x in rect.left until rect.right) {
+        for (y in maxOf(0, rect.top - 1) until rect.bottom) {
+            for (x in maxOf(0, rect.left - 1) until rect.right) {
                 val h = map[x, y]
                 val lum = (1 + HEIGHT_WEIGHT * h + SLOPE_WEIGHT * (h - map[x + 1, y + 1]))
                     .coerceIn(MIN_LUMINANCE, MAX_LUMINANCE)
