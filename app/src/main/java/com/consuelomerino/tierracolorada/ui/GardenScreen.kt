@@ -203,7 +203,12 @@ private fun SandCanvas(
     onMove: (Offset) -> Unit,
     onMoveEnd: (Long) -> Unit,
 ) {
-    val bitmap = remember(heights) { ImageBitmap(heights.width, heights.height) }
+    // A new screen (e.g. after the activity is recreated) starts with a blank image while the
+    // garden itself survives in the ViewModel, so the whole garden must be painted again.
+    val bitmap = remember(heights) {
+        heights.markAllDirty()
+        ImageBitmap(heights.width, heights.height)
+    }
     val pixels = remember(heights) { IntArray(heights.width * heights.height) }
     val tapSlopPx = with(LocalDensity.current) { 10.dp.toPx() }
 

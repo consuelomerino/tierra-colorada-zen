@@ -7,6 +7,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -93,5 +95,14 @@ class GardenScreenTest {
         settle()
         val after = vm.objects.single()
         assertTrue("stone jumped from ${stone.x} to ${after.x}", abs(after.x - stone.x) < 5f && abs(after.y - stone.y) < 5f)
+    }
+
+    @Test fun sandIsStillPaintedAfterTheActivityIsRecreated() {
+        // E.g. dark mode toggled, or Android Studio's Running Devices panel resizing the screen.
+        rule.activityRule.scenario.recreate()
+        settle()
+        val pixels = rule.onNodeWithTag("garden").captureToImage().toPixelMap()
+        val c = pixels[pixels.width / 2, pixels.height / 2]
+        assertTrue("expected red-ochre sand, got $c", c.red > c.green + 0.15f && c.red > c.blue + 0.15f)
     }
 }
