@@ -92,12 +92,25 @@ class GardenViewModel(
         }
     }
 
+    /**
+     * Sets up the garden for a grid of this size: loads the saved one the first time, and re-fits the
+     * current one when the window changes size (split screen, a foldable), so the sand stays under the finger.
+     */
     fun initialize(gridWidth: Int, gridHeight: Int) {
-        if (heights != null) return
-        val snapshot = store.load(gridWidth, gridHeight)
+        val current = heights
+        val snapshot = when {
+            current == null -> store.load(gridWidth, gridHeight)
+            current.width == gridWidth && current.height == gridHeight -> return
+            else -> {
+                strokeEnd()
+                unsaved = true
+                GardenSnapshot(current, garden.items, muted).fittedTo(gridWidth, gridHeight)
+            }
+        }
         val map = snapshot?.heights ?: HeightMap(gridWidth, gridHeight)
         garden = GardenObjects(gridWidth, gridHeight, snapshot?.objects.orEmpty())
         rake = Rake(map) { x, y -> garden.isBlocked(x, y) }
+        if (sweep != null) sweep = ClearSweep(map)
         objects = garden.items
         muted = snapshot?.muted ?: false
         map.markAllDirty()

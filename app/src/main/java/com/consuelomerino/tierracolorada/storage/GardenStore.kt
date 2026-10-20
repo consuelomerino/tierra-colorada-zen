@@ -17,7 +17,19 @@ import java.util.zip.Deflater
 import java.util.zip.Inflater
 
 /** Everything that is kept between sessions. */
-data class GardenSnapshot(val heights: HeightMap, val objects: List<GardenObject>, val muted: Boolean)
+data class GardenSnapshot(val heights: HeightMap, val objects: List<GardenObject>, val muted: Boolean) {
+    /** The same garden on a grid of another size: heights resampled and objects moved with them. */
+    fun fittedTo(gridWidth: Int, gridHeight: Int): GardenSnapshot {
+        if (heights.width == gridWidth && heights.height == gridHeight) return this
+        val sx = gridWidth.toFloat() / heights.width
+        val sy = gridHeight.toFloat() / heights.height
+        return GardenSnapshot(
+            heights.resampledTo(gridWidth, gridHeight),
+            objects.map { it.copy(x = it.x * sx, y = it.y * sy) },
+            muted,
+        )
+    }
+}
 
 /** Saves the garden to a private file atomically and loads it back, tolerating damaged files. */
 class GardenStore(private val dir: File) {
@@ -106,15 +118,7 @@ class GardenStore(private val dir: File) {
         }
         val muted = input.readBoolean()
 
-        var heights = HeightMap(width, height, values)
-        var fitted: List<GardenObject> = objects
-        if (width != gridWidth || height != gridHeight) {
-            heights = heights.resampledTo(gridWidth, gridHeight)
-            val sx = gridWidth.toFloat() / width
-            val sy = gridHeight.toFloat() / height
-            fitted = objects.map { it.copy(x = it.x * sx, y = it.y * sy) }
-        }
-        return GardenSnapshot(heights, fitted, muted)
+        return GardenSnapshot(HeightMap(width, height, values), objects, muted).fittedTo(gridWidth, gridHeight)
     }
 
     private fun invalid(reason: String): GardenSnapshot? {
