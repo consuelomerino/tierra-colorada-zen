@@ -4,12 +4,7 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /** A rectangle of grid cells; [right] and [bottom] are exclusive. */
-data class CellRect(val left: Int, val top: Int, val right: Int, val bottom: Int) {
-    fun union(other: CellRect) = CellRect(
-        minOf(left, other.left), minOf(top, other.top),
-        maxOf(right, other.right), maxOf(bottom, other.bottom),
-    )
-}
+data class CellRect(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
 /**
  * The sand surface: a grid of heights in [-1, 1], where 0 is flat sand,
@@ -20,7 +15,11 @@ class HeightMap(
     val height: Int,
     val values: FloatArray = FloatArray(width * height),
 ) {
-    private var dirty: CellRect? = null
+    // The changed area as plain numbers, so a write never allocates; empty while dirtyLeft >= dirtyRight.
+    private var dirtyLeft = 0
+    private var dirtyTop = 0
+    private var dirtyRight = 0
+    private var dirtyBottom = 0
 
     fun inBounds(x: Int, y: Int) = x in 0 until width && y in 0 until height
 
@@ -29,15 +28,24 @@ class HeightMap(
     operator fun set(x: Int, y: Int, value: Float) {
         if (!inBounds(x, y)) return
         values[y * width + x] = value.coerceIn(-1f, 1f)
-        val cell = CellRect(x, y, x + 1, y + 1)
-        dirty = dirty?.union(cell) ?: cell
+        if (dirtyLeft >= dirtyRight) {
+            dirtyLeft = x; dirtyTop = y; dirtyRight = x + 1; dirtyBottom = y + 1
+        } else {
+            if (x < dirtyLeft) dirtyLeft = x
+            if (y < dirtyTop) dirtyTop = y
+            if (x >= dirtyRight) dirtyRight = x + 1
+            if (y >= dirtyBottom) dirtyBottom = y + 1
+        }
     }
 
     /** Returns the area changed since the last call, or null if nothing changed. */
-    fun takeDirty(): CellRect? = dirty.also { dirty = null }
+    fun takeDirty(): CellRect? {
+        if (dirtyLeft >= dirtyRight) return null
+        return CellRect(dirtyLeft, dirtyTop, dirtyRight, dirtyBottom).also { dirtyLeft = 0; dirtyRight = 0 }
+    }
 
     fun markAllDirty() {
-        dirty = CellRect(0, 0, width, height)
+        dirtyLeft = 0; dirtyTop = 0; dirtyRight = width; dirtyBottom = height
     }
 
     fun resampledTo(newWidth: Int, newHeight: Int): HeightMap {
