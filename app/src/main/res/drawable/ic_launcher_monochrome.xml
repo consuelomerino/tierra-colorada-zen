@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-colour version for Android themed icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M37 59 C36 52 42 47 50 46 C58 45 66 46 70 51 C73 55 72 61 67 64 C61 67 50 67 44 66 C39 65 37 62 37 59 Z" android:fillColor="#FFFFFFFF"/>
+    <path android:pathData="M28,56 a26,22 0 1,0 52,0 a26,22 0 1,0 -52,0" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" android:fillColor="#00000000"/>
+    <group android:translateX="69" android:translateY="31" android:rotation="35">
+        <path android:pathData="M-9 0 C-4 -5 4 -5 9 0 C4 5 -4 5 -9 0 Z" android:fillColor="#FFFFFFFF"/>
+    </group>
+</vector>

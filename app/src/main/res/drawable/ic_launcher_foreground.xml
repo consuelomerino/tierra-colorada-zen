@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A garden stone and a drifted leaf. 108 x 108 adaptive-icon canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="1.2" android:translateY="2.2">
+        <path android:pathData="M37 59 C36 52 42 47 50 46 C58 45 66 46 70 51 C73 55 72 61 67 64 C61 67 50 67 44 66 C39 65 37 62 37 59 Z" android:fillColor="#3A3E39"/>
+    </group>
+    <path android:pathData="M37 59 C36 52 42 47 50 46 C58 45 66 46 70 51 C73 55 72 61 67 64 C61 67 50 67 44 66 C39 65 37 62 37 59 Z" android:fillColor="#646A62"/>
+    <path android:pathData="M41 54 C43 50 49 48 55 48 C61 48 66 49 68 52 C63 51 57 51 51 52 C47 53 44 54 41 54 Z" android:fillColor="#949A90"/>
+    <path android:pathData="M58 47.5 C61 46.5 65 47 67.5 49 C65 50 61 50 58 47.5 Z" android:fillColor="#5E9A47"/>
+    <group android:translateX="69" android:translateY="31" android:rotation="35">
+        <path android:pathData="M-9 0 C-4 -5 4 -5 9 0 C4 5 -4 5 -9 0 Z" android:fillColor="#2F6B3A"/>
+        <path android:pathData="M-8 0 L8 0" android:strokeColor="#7FB069" android:strokeWidth="0.9" android:strokeLineCap="round"/>
+    </group>
+</vector>
