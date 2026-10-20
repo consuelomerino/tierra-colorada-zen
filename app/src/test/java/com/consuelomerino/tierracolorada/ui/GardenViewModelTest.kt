@@ -48,7 +48,7 @@ class GardenViewModelTest {
 
     @Test fun clearNeedsConfirmation() {
         vm.initialize(360, 800)
-        vm.strokeStart(50f, 50f); vm.strokeEnd()
+        vm.strokeStart(50f, 50f); vm.strokeMove(90f, 50f, 16); vm.strokeEnd()
         vm.requestClear()
         assertTrue(vm.confirmingClear)
         vm.cancelClear()
@@ -57,7 +57,7 @@ class GardenViewModelTest {
 
     @Test fun confirmedClearFlattensAfterSweep() {
         vm.initialize(360, 800)
-        vm.strokeStart(50f, 50f); vm.strokeEnd()
+        vm.strokeStart(50f, 50f); vm.strokeMove(90f, 50f, 16); vm.strokeEnd()
         vm.requestClear(); vm.confirmClear(); vm.advanceClear(600)
         assertTrue(vm.heights!!.values.all { it == 0f })
     }

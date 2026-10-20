@@ -8,17 +8,32 @@ import org.junit.Test
 class RakeTest {
     private fun map() = HeightMap(100, 100)
 
-    @Test fun singleStampCarvesFourTroughsAcrossVerticalLine() {
+    @Test fun horizontalStrokeCarvesFourTroughsAcrossIt() {
         val m = map()
-        Rake(m).apply { beginStroke(50f, 50f); endStroke() }
-        // Initial direction (1,0) → tines spread along y at 50 ± 4 and 50 ± 12.
+        Rake(m).apply { beginStroke(30f, 50f); repeat(3) { moveTo(70f, 50f) }; endStroke() }
+        // Moving along +x → tines spread along y at 50 ± 4 and 50 ± 12.
         listOf(38, 46, 54, 62).forEach { y -> assertEquals(Rake.GROOVE_DEPTH, m[50, y], 1e-3f) }
     }
 
     @Test fun ridgeSitsBesideTrough() {
         val m = map()
-        Rake(m).apply { beginStroke(50f, 50f); endStroke() }
+        Rake(m).apply { beginStroke(30f, 50f); repeat(3) { moveTo(70f, 50f) }; endStroke() }
         assertTrue(m[50, 65] > 0.2f) // d = 3 from the tine at y = 62
+    }
+
+    @Test fun strokeStartUsesTheStrokesOwnDirection() {
+        val m = map()
+        val r = Rake(m)
+        r.beginStroke(10f, 10f); repeat(3) { r.moveTo(40f, 10f) }; r.endStroke() // horizontal first
+        r.beginStroke(50f, 50f); repeat(3) { r.moveTo(50f, 90f) }; r.endStroke() // then vertical
+        // A tine of the old (horizontal-stroke) orientation would sit at (50, 38), behind the start.
+        assertTrue("stray dot at start: ${m[50, 38]}", m[50, 38] >= 0f)
+    }
+
+    @Test fun tapWithoutMovingLeavesNoMarks() {
+        val m = map()
+        Rake(m).apply { beginStroke(50f, 50f); endStroke() }
+        assertTrue(m.values.all { it == 0f })
     }
 
     @Test fun fastStrokeLeavesNoGaps() {
@@ -36,8 +51,8 @@ class RakeTest {
     @Test fun newStrokeDoesNotConnectToPreviousStroke() {
         val m = map()
         val r = Rake(m)
-        r.beginStroke(10f, 20f); r.endStroke()
-        r.beginStroke(90f, 80f); r.endStroke()
+        r.beginStroke(10f, 20f); r.moveTo(20f, 20f); r.endStroke()
+        r.beginStroke(90f, 80f); r.moveTo(80f, 80f); r.endStroke()
         assertEquals(0f, m[50, 50])
     }
 

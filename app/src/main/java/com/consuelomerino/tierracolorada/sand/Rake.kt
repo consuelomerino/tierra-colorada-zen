@@ -16,19 +16,22 @@ class Rake(
     private val isBlocked: (Int, Int) -> Boolean = { _, _ -> false },
 ) {
     private val recent = ArrayDeque<Pair<Float, Float>>()
-    private val troughThisStroke = BooleanArray(map.width * map.height)
+    /** What this stroke has already carved into each cell: [NONE], [RIDGE] or [TROUGH]. */
+    private val strokeMarks = ByteArray(map.width * map.height)
+    private var startPending = false
     private var posX = 0f
     private var posY = 0f
     private var dirX = 1f
     private var dirY = 0f
 
+    /** Puts the rake down. Nothing is carved until the finger moves and the stroke has a direction. */
     fun beginStroke(x: Float, y: Float) {
         recent.clear()
-        troughThisStroke.fill(false)
+        strokeMarks.fill(NONE)
         recent.addLast(x to y)
         posX = x
         posY = y
-        stamp(x, y)
+        startPending = true
     }
 
     /** Moves the rake toward ([x], [y]) and returns how many cells it travelled. */
@@ -45,6 +48,10 @@ class Rake(
         dirX = dx / length
         dirY = dy / length
 
+        if (startPending) {
+            startPending = false
+            stamp(posX, posY)
+        }
         val steps = ceil(length).toInt()
         for (i in 1..steps) {
             val t = i.toFloat() / steps
@@ -72,13 +79,16 @@ class Rake(
                     if (!map.inBounds(x, y) || isBlocked(x, y)) continue
                     val d = hypot(x - tx, y - ty)
                     val index = y * map.width + x
+                    // Within one stroke, overlapping stamps keep the deepest groove and the highest
+                    // ridge, and a ridge never fills in a groove this stroke already carved.
                     if (d <= TINE_RADIUS) {
                         val depth = GROOVE_DEPTH * cos((PI * d / (2 * TINE_RADIUS)).toFloat())
-                        // Within one stroke, overlapping stamps keep the deepest groove.
-                        map[x, y] = if (troughThisStroke[index]) minOf(map[x, y], depth) else depth
-                        troughThisStroke[index] = true
-                    } else if (d <= reach && !troughThisStroke[index]) {
-                        map[x, y] = RIDGE_HEIGHT * sin((PI * (d - TINE_RADIUS) / TINE_RADIUS).toFloat())
+                        map[x, y] = if (strokeMarks[index] == TROUGH) minOf(map[x, y], depth) else depth
+                        strokeMarks[index] = TROUGH
+                    } else if (d <= reach && strokeMarks[index] != TROUGH) {
+                        val ridge = RIDGE_HEIGHT * sin((PI * (d - TINE_RADIUS) / TINE_RADIUS).toFloat())
+                        map[x, y] = if (strokeMarks[index] == RIDGE) maxOf(map[x, y], ridge) else ridge
+                        strokeMarks[index] = RIDGE
                     }
                 }
             }
@@ -93,5 +103,8 @@ class Rake(
         const val RIDGE_HEIGHT = 0.3f
         private const val SMOOTHING_WINDOW = 3
         private const val MIN_DIRECTION_LENGTH = 0.01f
+        private const val NONE: Byte = 0
+        private const val RIDGE: Byte = 1
+        private const val TROUGH: Byte = 2
     }
 }
