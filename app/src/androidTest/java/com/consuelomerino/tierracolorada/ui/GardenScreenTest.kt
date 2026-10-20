@@ -4,7 +4,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.lifecycle.Lifecycle
+import com.consuelomerino.tierracolorada.R
+import com.consuelomerino.tierracolorada.storage.GardenStore
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -171,5 +175,20 @@ class GardenScreenTest {
         rule.onNodeWithTag("garden").performTouchInput { cancel() }
         settle()
         assertFalse(vm.smoothing)
+    }
+
+    @Test fun muteSurvivesRecreationAndIsSaved() {
+        if (vm.muted) rule.onNodeWithTag("mute").performClick() // start unmuted
+        settle()
+        rule.onNodeWithTag("mute").performClick()
+        settle()
+        rule.activityRule.scenario.recreate() // e.g. a theme or language change
+        settle()
+        assertTrue(vm.muted)
+        rule.onNodeWithTag("mute").assertContentDescriptionEquals(rule.activity.getString(R.string.sound_on))
+        // Going to the background saves, so the setting also survives the app being closed.
+        rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        val saved = GardenStore(rule.activity.filesDir).load(vm.heights!!.width, vm.heights!!.height)
+        assertTrue("mute was not saved", saved?.muted == true)
     }
 }
