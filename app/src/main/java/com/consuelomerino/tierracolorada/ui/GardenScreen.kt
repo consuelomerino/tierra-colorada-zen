@@ -185,6 +185,12 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
         )
     }
 
+    if (viewModel.smoothing) {
+        LaunchedEffect(Unit) {
+            while (viewModel.smoothing) withFrameMillis { viewModel.smoothFrame() }
+        }
+    }
+
     if (viewModel.clearing) {
         LaunchedEffect(Unit) {
             val start = withFrameMillis { it }

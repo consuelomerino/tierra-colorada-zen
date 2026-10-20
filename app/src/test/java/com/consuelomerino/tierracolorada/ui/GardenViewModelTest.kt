@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -44,6 +45,31 @@ class GardenViewModelTest {
         vm.selectTool(Tool.SMOOTH)
         vm.strokeStart(50f, 50f); vm.strokeMove(90f, 50f, 16); vm.strokeEnd()
         assertTrue(vm.heights!!.values.all { it == 0f })
+    }
+
+    @Test fun smoothKeepsWorkingEachFrameWhileTheFingerIsStill() {
+        vm.initialize(360, 800)
+        vm.heights!![100, 100] = -0.8f
+        vm.selectTool(Tool.SMOOTH)
+        vm.strokeStart(100.5f, 100.5f)
+        assertTrue(vm.smoothing)
+        repeat(3) { vm.smoothFrame() }
+        assertEquals(-0.8f * 0.8f * 0.8f * 0.8f, vm.heights!![100, 100], 1e-4f)
+        vm.strokeEnd()
+        assertFalse(vm.smoothing)
+        vm.smoothFrame()
+        assertEquals(-0.8f * 0.8f * 0.8f * 0.8f, vm.heights!![100, 100], 1e-4f)
+    }
+
+    @Test fun smoothFollowsTheFinger() {
+        vm.initialize(360, 800)
+        vm.heights!![200, 100] = -0.8f
+        vm.selectTool(Tool.SMOOTH)
+        vm.strokeStart(100f, 100f)
+        vm.strokeMove(200.5f, 100.5f, 16)
+        vm.smoothFrame()
+        assertEquals(-0.8f * 0.8f, vm.heights!![200, 100], 1e-4f)
+        vm.strokeEnd()
     }
 
     @Test fun clearNeedsConfirmation() {

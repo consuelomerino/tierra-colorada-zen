@@ -131,4 +131,20 @@ class GardenScreenTest {
         settle()
         assertTrue("scale stuck at $scale", scale < 1.9f)
     }
+
+    @Test fun holdingStillWithSmoothKeepsFlattening() {
+        removeAllObjects()
+        rule.onNodeWithTag("tool_smooth").performClick()
+        rule.runOnUiThread { vm.heights!![180, 300] = -0.8f }
+        settle()
+        rule.onNodeWithTag("garden").performTouchInput {
+            val cell = width / 360f
+            down(Offset(180.5f * cell, 300.5f * cell))
+        }
+        rule.mainClock.advanceTimeBy(300) // about 18 frames with the finger still
+        val depth = vm.heights!![180, 300]
+        rule.onNodeWithTag("garden").performTouchInput { up() }
+        settle()
+        assertTrue("groove only smoothed to $depth", depth > -0.1f)
+    }
 }
