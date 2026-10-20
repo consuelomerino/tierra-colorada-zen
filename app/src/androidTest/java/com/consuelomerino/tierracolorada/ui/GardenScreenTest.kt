@@ -110,4 +110,25 @@ class GardenScreenTest {
         val after = vm.objects.single()
         assertTrue("stone jumped from ${stone.x} to ${after.x}", abs(after.x - stone.x) < 5f && abs(after.y - stone.y) < 5f)
     }
+
+    @Test fun pinchingInAfterHittingMaxSizeShrinksRightAway() {
+        removeAllObjects()
+        rule.onNodeWithTag("tool_place").performClick()
+        rule.runOnUiThread { vm.addObject(ObjectType.STONE, 180f, 300f) }
+        settle()
+        val stone = vm.objects.single()
+        rule.onNodeWithTag("garden").performTouchInput {
+            val cell = width / 360f
+            val onStone = Offset(stone.x * cell, stone.y * cell)
+            down(0, onStone)
+            down(1, onStone + Offset(100f, 0f))
+            moveBy(1, Offset(400f, 0f)) // spread to 5x: the stone stops at 2x
+            moveBy(1, Offset(-100f, 0f)) // close a fifth of the way
+        }
+        settle()
+        val scale = vm.objects.single().scale
+        rule.onNodeWithTag("garden").performTouchInput { up(1); up(0) }
+        settle()
+        assertTrue("scale stuck at $scale", scale < 1.9f)
+    }
 }

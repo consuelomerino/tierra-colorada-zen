@@ -54,6 +54,7 @@ import com.consuelomerino.tierracolorada.life.LifeDirector
 import com.consuelomerino.tierracolorada.life.LifeState
 import com.consuelomerino.tierracolorada.life.drawLife
 import com.consuelomerino.tierracolorada.objects.GardenObject
+import com.consuelomerino.tierracolorada.objects.GardenObjects
 import com.consuelomerino.tierracolorada.objects.ObjectType
 import com.consuelomerino.tierracolorada.objects.drawGardenObject
 import com.consuelomerino.tierracolorada.sand.CellRect
@@ -349,7 +350,8 @@ private suspend fun AwaitPointerEventScope.moveObjectGesture(
         }
         if (moving) {
             if (pressed >= 2) {
-                zoom *= event.calculateZoom()
+                // Keep the zoom within the size limits, so pinching back in after hitting one responds at once.
+                zoom = (zoom * event.calculateZoom()).coerceIn(GardenObjects.MIN_SCALE / target.scale, GardenObjects.MAX_SCALE / target.scale)
                 rotationDegrees += event.calculateRotation()
                 viewModel.transformObject(target.id, target.scale * zoom, target.rotation + Math.toRadians(rotationDegrees.toDouble()).toFloat())
             } else {
