@@ -1,5 +1,6 @@
 package com.consuelomerino.tierracolorada.ui
 
+import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -20,6 +21,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,6 +37,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -42,12 +45,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.consuelomerino.tierracolorada.R
+import com.consuelomerino.tierracolorada.life.LifeDirector
+import com.consuelomerino.tierracolorada.life.drawLife
 import com.consuelomerino.tierracolorada.objects.GardenObject
 import com.consuelomerino.tierracolorada.objects.ObjectType
 import com.consuelomerino.tierracolorada.objects.drawGardenObject
 import com.consuelomerino.tierracolorada.sand.HeightMap
 import com.consuelomerino.tierracolorada.sand.SandShader
+import kotlin.random.Random
 
 /** An object being dragged: a new one from the tray ([newType]) or an existing one ([movingId]). */
 private data class Drag(val newType: ObjectType? = null, val movingId: Long? = null, val finger: Offset)
@@ -87,6 +96,8 @@ fun GardenScreen(viewModel: GardenViewModel, onEvent: (GardenEvent) -> Unit = {}
                 drag = null
             },
         )
+
+        LifeLayer(viewModel, heights, cellSize)
 
         // Ghost of a new object being dragged from the tray.
         drag?.newType?.let { type ->
@@ -227,6 +238,28 @@ private fun SandCanvas(
             filterQuality = FilterQuality.Low,
         )
         for (obj in drawOrder(viewModel.objects)) drawGardenObject(obj, cellSize)
+    }
+}
+
+/** Hummingbird, leaves, shadows and ripples, animated only while the app is visible. */
+@Composable
+private fun LifeLayer(viewModel: GardenViewModel, heights: HeightMap, cellSize: Float) {
+    val context = LocalContext.current
+    val reducedMotion = remember {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+    val director = remember(heights) { LifeDirector(Random.Default, heights.width, heights.height) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) withFrameMillis { now = System.currentTimeMillis() }
+        }
+    }
+    Canvas(Modifier.fillMaxSize()) {
+        val objects = viewModel.objects
+        val state = director.update(now, objects, reducedMotion)
+        drawLife(state, viewModel.pondRipples.active(now), now, cellSize, objects.firstOrNull { it.type == ObjectType.POND })
     }
 }
 
